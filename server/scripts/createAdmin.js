@@ -1,8 +1,11 @@
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
+
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
 
 const ADMIN_EMAIL = 'admin@dtu.ac.in';
-const ADMIN_PASSWORD = 'SuperSecretpassword@123'; // Choose a strong password
+const ADMIN_PASSWORD = 'supersecretpassword123';
 
 const createSuperAdmin = async () => {
   try {

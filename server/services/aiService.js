@@ -4,7 +4,7 @@ const { HumanMessage } = require("@langchain/core/messages");
 
 // Initialize the model connection
 const model = new ChatGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY,
+  apiKey: process.env.GOOGLE_API_KEY,
   model: "gemini-1.5-flash",
   temperature: 0.3, // Lower temperature for more predictable, analytical responses
 });
@@ -18,7 +18,7 @@ const generateGrievance = async (scenario) => {
   const prompt = `
     You are a B.Tech student at Delhi Technological University (DTU). Your task is to write a formal grievance based on the following scenario.
     The grievance should be well-structured, polite, and clearly state the problem and the desired resolution.
-    Do not add a subject line or your name/roll number, only write the body of the grievance.
+    Do not add a subject line or your name/roll number or who it is addressed to, only write the body of the grievance.
     Scenario: "${scenario}"
     Grievance Body:
   `;
