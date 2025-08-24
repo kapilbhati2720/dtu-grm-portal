@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { toast } from 'react-toastify';
+
 
 const GrievanceDetailPage = () => {
   const { ticketId } = useParams();
@@ -12,6 +14,8 @@ const GrievanceDetailPage = () => {
   const fetchGrievanceDetails = async () => {
     try {
       const res = await axios.get(`http://localhost:5000/api/grievances/${ticketId}`);
+      console.log(res);
+      
       setGrievance(res.data.grievance);
       setUpdates(res.data.updates);
     } catch (err) {
@@ -30,11 +34,12 @@ const GrievanceDetailPage = () => {
     if (!comment.trim()) return;
     try {
         await axios.post(`http://localhost:5000/api/grievances/${grievance.grievance_id}/comments`, { comment });
+        toast.success('Comment posted successfully!');
         setComment('');
         fetchGrievanceDetails(); // Refresh details to show new comment
     } catch (err) {
         console.error('Failed to post comment', err);
-        alert('Failed to post comment.');
+        toast.error('Failed to post comment.');
     }
   };
 

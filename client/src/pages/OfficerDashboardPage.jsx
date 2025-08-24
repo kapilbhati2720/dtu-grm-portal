@@ -30,7 +30,7 @@ const OfficerDashboardPage = () => {
         <div className="space-y-4">
           {grievances.length > 0 ? (
             grievances.map((g) => (
-              <Link key={g.ticket_id} to={`/officer/grievance/${g.ticket_id}`}className="block">
+              <Link key={g.ticket_id} to={`/officer/grievance/${g.ticket_id}`} className="block">
                    <div className="p-4 border rounded-md hover:bg-gray-50 hover:shadow-sm transition-shadow">
                      <p className="font-bold text-blue-700">{g.title}</p>
                      <p className="text-sm text-gray-600">From: {g.student_name} | Ticket: {g.ticket_id}</p>

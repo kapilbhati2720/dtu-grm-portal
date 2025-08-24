@@ -1,6 +1,8 @@
-import React, { useContext } from 'react';
-import { Routes, Route, Link, useNavigate } from 'react-router-dom';
+import React, { useContext, useEffect } from 'react'; // 1. Import useEffect
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'; // 1. Import useLocation
 import { AuthContext } from './context/AuthContext';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 // Import all pages and components
 import HomePage from './pages/HomePage';
@@ -18,47 +20,57 @@ import OfficerRoute from './components/OfficerRoute';
 import AdminRoute from './components/AdminRoute';
 import Notifications from './components/Notifications';
 
+
 function App() {
   const { isAuthenticated, user, loading, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation(); // 2. Get the current browser location
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  // Helper function to get the correct dashboard path based on role
   const getDashboardPath = () => {
-    if (!user) return '/dashboard'; // Default fallback
-    switch (user.role) {
-      case 'super_admin':
-        return '/admin/dashboard';
-      case 'nodal_officer':
-        return '/officer/dashboard';
-      default:
-        return '/dashboard';
-    }
+    if (!user || !user.roles || user.roles.length === 0) return '/dashboard';
+    if (user.roles.some(r => r.role_name === 'super_admin')) return '/admin/dashboard';
+    if (user.roles.some(r => r.role_name === 'nodal_officer')) return '/officer/dashboard';
+    return '/dashboard';
   };
+  
+  // 3. Add the useEffect hook to handle post-login redirection
+  useEffect(() => {
+    // Wait until loading is false and the user is authenticated
+    if (!loading && isAuthenticated && user) {
+      // We only want to redirect if the user has just landed on the login page
+      // after becoming authenticated.
+      if (location.pathname === '/login') {
+        const dashboardPath = getDashboardPath(); // Reuse your helper function!
+        navigate(dashboardPath, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, loading, navigate, location]); // Dependencies for the effect
+
+  if (loading) {
+    return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <nav className="bg-white shadow p-4 flex justify-between items-center px-8">
+      <nav className="sticky top-0 z-50 bg-white shadow p-4 flex justify-between items-center px-8">
         <Link to="/" className="text-gray-800 hover:text-blue-600 font-bold text-lg">DTU GRM Portal</Link>
-        
         <div className="flex items-center gap-6">
-          { !loading && isAuthenticated ? (
+          {isAuthenticated ? (
             <>
               <Link to={getDashboardPath()} className="text-gray-700 hover:text-blue-600 font-semibold">Dashboard</Link>
               <Notifications />
               <button onClick={handleLogout} className="text-gray-700 hover:text-blue-600 font-semibold">Logout</button>
             </>
           ) : (
-            !loading && (
-              <>
-                <Link to="/login" className="text-gray-700 hover:text-blue-600 font-semibold">Login</Link>
-                <Link to="/register" className="text-gray-700 hover:text-blue-600 font-semibold">Register</Link>
-              </>
-            )
+            <>
+              <Link to="/login" className="text-gray-700 hover:text-blue-600 font-semibold">Login</Link>
+              <Link to="/register" className="text-gray-700 hover:text-blue-600 font-semibold">Register</Link>
+            </>
           )}
         </div>
       </nav>
@@ -83,6 +95,18 @@ function App() {
           <Route path="/admin/dashboard" element={<AdminRoute><SuperAdminDashboard /></AdminRoute>} />
         </Routes>
       </main>
+      <ToastContainer
+        position="bottom-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   );
 }

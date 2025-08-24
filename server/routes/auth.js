@@ -81,46 +81,48 @@ router.get('/verify-email', async (req, res) => {
 
 
 // @route   POST /api/auth/login
-// @desc    Authenticate user & get token
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
-
   try {
-    let user = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-    if (user.rows.length === 0) {
-      return res.status(400).json({ msg: 'Invalid Credentials' });
+    // 1. Find the user by email
+    let userRes = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (userRes.rows.length === 0) return res.status(400).json({ msg: 'Invalid Credentials' });
+
+    const user = userRes.rows[0];
+
+    // 2. THE FIX: Check if the account is active BEFORE checking the password 🛑
+    if (!user.is_active) {
+      return res.status(403).json({ msg: 'Your account has been deactivated. Please contact an administrator.' });
     }
 
-    const userData = user.rows[0];
-
-    // Check if account is verified
-    if (!userData.is_verified) {
-        return res.status(400).json({ msg: 'Please verify your email before logging in.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, userData.password_hash);
+    // 3. If active, proceed with the normal password check
+    const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ msg: 'Invalid Credentials' });
     }
 
-    const payload = {
-      user: {
-        id: userData.user_id,
-        name: userData.full_name,
-        email: userData.email,
-        role: userData.role,
-      },
+    // NEW LOGIC: Fetch roles from the new table
+    const rolesRes = await pool.query(`
+      SELECT r.role_name, d.name as department_name, udr.department_id
+      FROM user_department_roles udr
+      JOIN roles r ON udr.role_id = r.role_id
+      JOIN departments d ON udr.department_id = d.department_id
+      WHERE udr.user_id = $1`, [user.user_id]
+    );
+
+    const userPayload = {
+      id: user.user_id,
+      name: user.full_name,
+      email: user.email,
+      roles: rolesRes.rows, // This will be an array of roles/departments
     };
 
-    jwt.sign(
-      payload,
-      process.env.JWT_SECRET,
-      { expiresIn: '5h' },
-      (err, token) => {
-        if (err) throw err;
-        res.json({ token });
-      }
-    );
+    const payload = { user: userPayload };
+    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '5h' }, (err, token) => {
+      if (err) throw err;
+      res.json({ token });
+    });
+
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -129,20 +131,27 @@ router.post('/login', async (req, res) => {
 
 // @route   GET /api/auth
 // @desc    Get logged-in user's data
-// @access  Private
 router.get('/', auth, async (req, res) => {
   try {
-    // Updated SELECT statement to fetch all required details
     const user = await pool.query(
-      "SELECT user_id, full_name, email, role, roll_number, admission_year, branch_code FROM users WHERE user_id = $1",
+      "SELECT user_id, full_name, email, roll_number, admission_year, branch_code FROM users WHERE user_id = $1",
       [req.user.id]
     );
 
-    if (user.rows.length === 0) {
-      return res.status(404).json({ msg: 'User not found' });
-    }
+    // We also need to fetch the user's roles from the new table
+    const rolesRes = await pool.query(
+      `SELECT r.role_name FROM user_department_roles udr
+       JOIN roles r ON udr.role_id = r.role_id
+       WHERE udr.user_id = $1`,
+      [req.user.id]
+    );
 
-    res.json(user.rows[0]);
+    const userData = {
+      ...user.rows[0],
+      roles: rolesRes.rows,
+    };
+
+    res.json(userData);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

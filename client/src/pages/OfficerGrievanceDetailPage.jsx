@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 const OfficerGrievanceDetailPage = () => {
   const { ticketId } = useParams();
@@ -14,7 +15,7 @@ const OfficerGrievanceDetailPage = () => {
 
   const fetchGrievanceDetails = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/officer/grievances/${ticketId}`);
+      const res = await axios.get(`http://localhost:5000/api/grievances/${ticketId}`);
       setGrievance(res.data.grievance);
       setUpdates(res.data.updates);
       setNewStatus(res.data.grievance.status); // Set initial status
@@ -33,10 +34,10 @@ const OfficerGrievanceDetailPage = () => {
     e.preventDefault();
     try {
       await axios.put(`http://localhost:5000/api/officer/grievances/${ticketId}/status`, { status: newStatus });
-      alert('Status updated successfully!');
+      toast.success('Status updated successfully!');
       fetchGrievanceDetails(); // Refresh details
     } catch (err) {
-      alert('Failed to update status.');
+      toast.error('Failed to update status.');
     }
   };
 
@@ -44,11 +45,12 @@ const OfficerGrievanceDetailPage = () => {
     e.preventDefault();
     if (!comment.trim()) return;
     try {
-      await axios.post(`http://localhost:5000/api/grievances/${grievance.grievance_id}/comments`, { comment });
+      await axios.post(`http://localhost:5000/api/officer/grievances/${grievance.ticket_id}/comments`, { comment });
+      toast.success('Comment posted successfully!');
       setComment('');
       fetchGrievanceDetails(); // Refresh details
     } catch (err) {
-      alert('Failed to post comment.');
+      toast.error('Failed to post comment.');
     }
   };
 

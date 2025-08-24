@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app); 
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: ["http://localhost:5173", "http://localhost:5174"],
     methods: ["GET", "POST", "PUT"]
   }
 });
@@ -32,6 +32,7 @@ app.use('/api/notifications', notificationsRoutes);
 app.use('/api/admin', adminRoutes); // Use admin routes
 app.use('/api/grievances', grievancesRoutes);
 app.use('/api/officer', officerRoutes);
+app.use('/api/admin', require('./routes/admin'));
 
 io.on('connection', (socket) => {
     socket.on('addUser', (userId) => {

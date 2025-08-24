@@ -1,6 +1,7 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { toast } from 'react-toastify';
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -14,19 +15,13 @@ const LoginPage = () => {
   const onSubmit = async (e) => {
     e.preventDefault();
     try {
-      const loggedInUser = await login(email, password);
-      
-      // The context handles everything else. Now we just redirect.
-      if (loggedInUser.role === 'super_admin') {
-        navigate('/admin/dashboard');
-      } else if (loggedInUser.role === 'nodal_officer') {
-        navigate('/officer/dashboard');
-      } else {
-        navigate('/dashboard');
-      }
-
+      // Just call login and pass it everything it needs.
+      // The context will now handle the navigation.
+      await login(email, password, navigate);
     } catch (err) {
-      alert(err.response?.data?.msg || 'An error occurred during login.');
+      // console.log("Full error response from server:", err.response); 
+      const errorMessage = err.response?.data?.msg || 'An error occurred during login.';
+      toast.error(errorMessage);
     }
   };
 

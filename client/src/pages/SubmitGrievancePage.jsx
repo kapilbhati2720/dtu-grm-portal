@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify'; 
 
 const SubmitGrievancePage = () => {
   const [formData, setFormData] = useState({
@@ -20,12 +21,14 @@ const SubmitGrievancePage = () => {
       const apiUrl = 'http://localhost:5000/api/grievances';
       const res = await axios.post(apiUrl, formData);
       
-      alert('Grievance submitted successfully! Ticket ID: ' + res.data.ticket_id);
-      navigate('/dashboard'); // Redirect back to dashboard after submission
+      toast.success(`Grievance submitted successfully! Ticket ID: ${res.data.ticket_id}`);
+      // Redirect to the my-grievances page so the user can see their submission
+      navigate('/my-grievances');
 
     } catch (err) {
-      console.error(err.response ? err.response.data : err.message);
-      alert(err.response ? err.response.data.msg : 'An error occurred.');
+      // This provides a helpful message for any kind of error
+      const errorMessage = err.response?.data?.msg || "An unexpected error occurred. Please try again.";
+      toast.error(errorMessage);
     }
   };
 

@@ -64,14 +64,32 @@ export const AuthProvider = ({ children }) => {
     };
   }, [user, fetchNotifications]);
 
-  const login = async (email, password) => {
+  const login = async (email, password, navigate) => { // <-- 1. Add navigate here
     const config = { headers: { 'Content-Type': 'application/json' } };
     const body = JSON.stringify({ email, password });
     try {
       const res = await axios.post('http://localhost:5000/api/auth/login', body, config);
       setAuthToken(res.data.token);
+      
+      // We don't need to await loadUser() here anymore for navigation.
+      // We can decode the token immediately for the role check.
+      const user = jwtDecode(res.data.token).user;
+
+      // --- 2. Move the navigation logic here ---
+      const userRoles = user.roles.map(role => role.role_name);
+
+      if (userRoles.includes('super_admin')) {
+        navigate('/admin/dashboard');
+      } else if (userRoles.includes('nodal_officer')) {
+        navigate('/officer/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+      // --- End of new logic ---
+
+      // Now, load the user in the background to set the global state
       await loadUser();
-      return jwtDecode(res.data.token).user;
+
     } catch (err) {
       throw err;
     }

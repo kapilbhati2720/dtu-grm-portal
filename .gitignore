@@ -1,5 +1,6 @@
 # Dependency directories
 node_modules/
+client/node_modules/
 
 # Environment variables
 .env
@@ -11,3 +12,6 @@ build/
 
 # Log files
 *.log
+
+# Temporary SQL files
+*.pgsql # Ignore all .pgsql files
