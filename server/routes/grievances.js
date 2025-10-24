@@ -124,10 +124,24 @@ module.exports = function(io, onlineUsers) {
 
       // Fetch updates if authorized
       const updatesRes = await pool.query(
-        `SELECT u.comment, u.update_type, u.created_at, us.full_name as author_name 
-        FROM grievance_updates u 
-        JOIN users us ON u.updated_by_id = us.user_id 
-        WHERE u.grievance_id = $1 ORDER BY u.created_at ASC`,
+        `SELECT
+      u.comment,
+      u.update_type,
+      u.created_at,
+      us.full_name AS author_name,
+      COALESCE(r.role_name, 'student') AS role
+    FROM
+      grievance_updates AS u
+    JOIN
+      users AS us ON u.updated_by_id = us.user_id
+    LEFT JOIN
+      user_department_roles AS udr ON us.user_id = udr.user_id
+    LEFT JOIN
+      roles AS r ON udr.role_id = r.role_id
+    WHERE
+      u.grievance_id = $1
+    ORDER BY
+      u.created_at ASC`,
         [grievance.grievance_id]
       );
 

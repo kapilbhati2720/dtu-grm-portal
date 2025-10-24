@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
-
+import { AuthContext } from '../context/AuthContext';
 
 const GrievanceDetailPage = () => {
   const { ticketId } = useParams();
+  const { user } = useContext(AuthContext);
   const [grievance, setGrievance] = useState(null);
   const [updates, setUpdates] = useState([]);
   const [comment, setComment] = useState('');
@@ -43,74 +44,109 @@ const GrievanceDetailPage = () => {
     }
   };
 
+// --- START OF NEW PERMISSION LOGIC ---
+
+  // 1. Get the grievance's department name. (Assuming it's available, if not, we get the ID)
+  // Let's assume your API returns `department_name` along with the grievance details.
+  const grievanceDepartment = grievance?.department_name; 
+
+  // 2. Get a list of departments this officer manages.
+  const officerDepartments = user?.roles
+      .filter(role => role.role_name === 'nodal_officer' || role.role_name === 'super_admin')
+      .map(role => role.department_name) || []  
+  // 3. The new, more specific permission check.
+  // A super_admin can see all actions. An officer can only see actions for their department.
+  const isSuperAdmin = user?.roles.some(role => role.role_name === 'super_admin');
+  const isAssignedOfficer = isSuperAdmin || (officerDepartments.includes(grievanceDepartment));
+
+  // --- END OF NEW PERMISSION LOGIC ---
+
   if (loading) return <p className="text-center mt-8">Loading grievance details...</p>;
   if (!grievance) return <p className="text-center mt-8">Grievance not found.</p>;
 
   return (
-    <div className="max-w-4xl mx-auto mt-10 p-4 md:p-8">
-      {/* --- Grievance Details Card (Restored) --- */}
-      <div className="bg-white p-8 rounded-lg shadow-xl mb-8">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-3xl font-bold text-gray-800">{grievance.title}</h1>
-          <span className="bg-blue-100 text-blue-800 text-lg font-semibold px-3 py-1 rounded">
-            {grievance.status}
-          </span>
-        </div>
-        <p className="text-md text-gray-500 mb-6">TICKET #{grievance.ticket_id}</p>
-        <div className="bg-gray-50 p-6 rounded-md mb-6">
-          <h3 className="font-semibold text-lg mb-2">Description</h3>
-          <p className="text-gray-700 whitespace-pre-wrap">{grievance.description}</p>
-        </div>
-        <div className="border-t pt-4 text-gray-600">
-          <p><span className="font-semibold text-gray-800">Category:</span> {grievance.category}</p>
-          <p><span className="font-semibold text-gray-800">Submitted:</span> {new Date(grievance.created_at).toLocaleString()}</p>
-        </div>
+  <div className="max-w-4xl mx-auto mt-10 p-4 md:p-8">
+    {/* --- Grievance Details Card --- */}
+    <div className="bg-white p-8 rounded-lg shadow-xl mb-8">
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold text-gray-800">{grievance.title}</h1>
+        <span className="bg-blue-100 text-blue-800 text-lg font-semibold px-3 py-1 rounded">
+          {grievance.status}
+        </span>
       </div>
-
-      {/* --- Grievance History / Comments --- */}
-      <div className="bg-white p-8 rounded-lg shadow-xl mb-8">
-        <h2 className="text-2xl font-bold mb-4">Grievance History</h2>
-        <div className="space-y-6">
-          {updates.length > 0 ? (
-            updates.map((update, index) => (
-              <div key={index} className="border-l-4 border-gray-200 pl-4">
-                <p className="font-semibold text-gray-800">{update.author_name} <span className="text-sm text-gray-500 capitalize">({update.role})</span></p>
-                <p className="text-gray-700 my-1">{update.comment}</p>
-                <p className="text-xs text-gray-400">{new Date(update.created_at).toLocaleString()}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-gray-500">No updates or comments yet.</p>
-          )}
-        </div>
+      <p className="text-md text-gray-500 mb-6">TICKET #{grievance.ticket_id}</p>
+      <div className="bg-gray-50 p-6 rounded-md mb-6">
+        <h3 className="font-semibold text-lg mb-2">Description</h3>
+        <p className="text-gray-700 whitespace-pre-wrap">{grievance.description}</p>
       </div>
-      
-      {/* --- Add Comment Form --- */}
-      <div className="bg-white p-8 rounded-lg shadow-xl">
-        <h2 className="text-2xl font-bold mb-4">Add a Comment</h2>
-        <form onSubmit={handleCommentSubmit}>
-          <textarea 
-            value={comment} 
-            onChange={(e) => setComment(e.target.value)} 
-            rows="4" 
-            className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500" 
-            placeholder="Type your comment here..."
-            required
-          ></textarea>
-          <button 
-            type="submit" 
-            className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Submit Comment
-          </button>
-        </form>
+      <div className="border-t pt-4 text-gray-600">
+        <p><span className="font-semibold text-gray-800">Category:</span> {grievance.category}</p>
+        <p><span className="font-semibold text-gray-800">Submitted:</span> {new Date(grievance.created_at).toLocaleString()}</p>
       </div>
-
-      <Link to="/my-grievances" className="inline-block mt-8 text-blue-600 hover:underline">
-        &larr; Back to My Grievances
-      </Link>
     </div>
-  );
+
+    {/* --- Officer Actions (Conditionally Rendered with Department Check) --- */}
+    {isAssignedOfficer && (
+      <div className="bg-white p-6 rounded-lg shadow-xl mb-8">
+        <h2 className="text-2xl font-bold mb-4">Officer Actions</h2>
+        <div className="flex flex-wrap gap-4">
+          <button className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded">
+            Mark as Resolved
+          </button>
+          <button className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+            Reject
+          </button>
+          <button className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded">
+            Escalate
+          </button>
+        </div>
+      </div>
+    )}
+
+    {/* --- Grievance History / Comments --- */}
+    <div className="bg-white p-8 rounded-lg shadow-xl mb-8">
+      <h2 className="text-2xl font-bold mb-4">Grievance History</h2>
+      <div className="space-y-6">
+        {updates.length > 0 ? (
+          updates.map((update, index) => (
+            <div key={index} className="border-l-4 border-gray-200 pl-4">
+              <p className="font-semibold text-gray-800">{update.author_name} <span className="text-sm text-gray-500 capitalize">({update.role})</span></p>
+              <p className="text-gray-700 my-1">{update.comment}</p>
+              <p className="text-xs text-gray-400">{new Date(update.created_at).toLocaleString()}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-500">No updates or comments yet.</p>
+        )}
+      </div>
+    </div>
+    
+    {/* --- Add Comment Form --- */}
+    <div className="bg-white p-8 rounded-lg shadow-xl">
+      <h2 className="text-2xl font-bold mb-4">Add a Comment</h2>
+      <form onSubmit={handleCommentSubmit}>
+        <textarea 
+          value={comment} 
+          onChange={(e) => setComment(e.target.value)} 
+          rows="4" 
+          className="w-full p-2 border rounded-md focus:ring-2 focus:ring-blue-500" 
+          placeholder="Type your comment here..."
+          required
+        ></textarea>
+        <button 
+          type="submit" 
+          className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Submit Comment
+        </button>
+      </form>
+    </div>
+
+    <Link to="/my-grievances" className="inline-block mt-8 text-blue-600 hover:underline">
+      &larr; Back to My Grievances
+    </Link>
+  </div>
+);
 };
 
 export default GrievanceDetailPage;

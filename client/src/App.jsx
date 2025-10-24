@@ -14,7 +14,6 @@ import MyGrievancesPage from './pages/MyGrievancesPage';
 import GrievanceDetailPage from './pages/GrievanceDetailPage';
 import SubmitGrievancePage from './pages/SubmitGrievancePage';
 import OfficerDashboardPage from './pages/OfficerDashboardPage';
-import OfficerGrievanceDetailPage from './pages/OfficerGrievanceDetailPage';
 import PrivateRoute from './components/PrivateRoute';
 import OfficerRoute from './components/OfficerRoute';
 import AdminRoute from './components/AdminRoute';
@@ -89,7 +88,7 @@ function App() {
 
           {/* Officer Protected Routes */}
           <Route path="/officer/dashboard" element={<OfficerRoute><OfficerDashboardPage /></OfficerRoute>} />
-          <Route path="/officer/grievance/:ticketId" element={<OfficerRoute><OfficerGrievanceDetailPage /></OfficerRoute>} />
+          <Route path="/officer/grievance/:ticketId" element={<OfficerRoute><GrievanceDetailPage /></OfficerRoute>} />
 
           {/* Admin Protected Route */}
           <Route path="/admin/dashboard" element={<AdminRoute><SuperAdminDashboard /></AdminRoute>} />

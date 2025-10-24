@@ -22,3 +22,8 @@ JOIN
     roles AS r ON udr.role_id = r.role_id
 WHERE
     u.email = 'admin@dtu.ac.in';
+
+
+
+-- Add verification token columns to users table
+-- ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires TIMESTAMPTZ;
