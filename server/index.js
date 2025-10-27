@@ -26,13 +26,14 @@ const notificationsRoutes = require('./routes/notifications');
 const adminRoutes = require('./routes/admin'); // Import admin routes
 const grievancesRoutes = require('./routes/grievances')(io, onlineUsers);
 const officerRoutes = require('./routes/officer')(io, onlineUsers);
+const departmentsRoutes = require('./routes/departments');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/admin', adminRoutes); // Use admin routes
 app.use('/api/grievances', grievancesRoutes);
 app.use('/api/officer', officerRoutes);
-app.use('/api/admin', require('./routes/admin'));
+app.use('/api/departments', departmentsRoutes);
 
 io.on('connection', (socket) => {
     socket.on('addUser', (userId) => {

@@ -3,10 +3,16 @@ import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
 
-export default {
+export default defineConfig({
+  plugins: [react()],
   server: {
     proxy: {
-      '/api': 'http://localhost:5000',
+      // All requests to /api will be forwarded to your backend server
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
-};
+});

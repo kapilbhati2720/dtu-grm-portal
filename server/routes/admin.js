@@ -54,6 +54,7 @@ router.get('/users', [auth, isAdmin], async (req, res) => {
           u.full_name, 
           u.email, 
           u.is_active,
+          u.is_verified,
           COALESCE(
               json_agg(DISTINCT jsonb_build_object('role_name', r.role_name)) 
               FILTER (WHERE r.role_id IS NOT NULL), 
@@ -288,6 +289,39 @@ router.post('/triage-grievance', [auth, isAdmin], async (req, res) => {
       console.error(err.message);
       res.status(500).send('Server Error');
     }
+  });
+
+  // @route   POST /api/admin/resend-invite
+  // @desc    Resend the "Set Password" invite email to a user
+  // @access  Private (Admin)
+  router.post('/resend-invite', [auth, isAdmin], async (req, res) => {
+      const { userId, email, fullName } = req.body;
+
+      try {
+          const setupToken = crypto.randomBytes(32).toString('hex');
+          const tokenExpires = new Date(Date.now() + 3600000 * 24); // 24 hours validity
+
+          await pool.query(
+              "UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE user_id = $3",
+              [setupToken, tokenExpires, userId]
+          );
+
+          const setupUrl = `http://localhost:5173/set-password/${setupToken}`; // Ensure this port is correct
+          const emailMessage = `
+              <h2>Welcome to the DTU Grievance Portal!</h2>
+              <p>An administrator has created or re-sent an invite for your account.</p>
+              <p>Please click the link below to set your password. This link is valid for 24 hours.</p>
+              <a href="${setupUrl}" style="background-color: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Set Your Password</a>
+          `;
+
+          await sendEmail({ to: email, subject: 'Activate Your DTU Grievance Portal Account', html: emailMessage });
+          
+          res.json({ msg: `Invite resent successfully to ${fullName}.` });
+
+      } catch (err) {
+          console.error(err.message);
+          res.status(500).send('Server Error');
+      }
   });
 
 module.exports = router;

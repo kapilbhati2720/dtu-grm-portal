@@ -2,11 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import CreateUserModal from './CreateUserModal';
+import AssignRoleModal from './AssignRoleModal';
+import ConfirmationModal from '../common/ConfirmationModal';
 
 const UserList = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setCreateModalOpen] = useState(false);
+  const [managingUser, setManagingUser] = useState(null);
+  const [confirmation, setConfirmation] = useState(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -21,37 +25,40 @@ const UserList = () => {
     }
   }, []);
 
+
+
+  const handleConfirmAction = async () => {
+      const { action, user } = confirmation;
+      try {
+          switch (action) {
+              case 'deactivate':
+                  await axios.put(`/api/admin/users/${user.user_id}/deactivate`);
+                  toast.success(`${user.full_name} has been deactivated.`);
+                  break;
+              case 'reactivate':
+                  await axios.put(`/api/admin/users/${user.user_id}/reactivate`);
+                  toast.success(`${user.full_name} has been re-activated.`);
+                  break;
+              case 'resendInvite':
+                  await axios.post('/api/admin/resend-invite', { userId: user.user_id, email: user.email, fullName: user.full_name });
+                  toast.success(`Invite resent to ${user.full_name}.`);
+                  break;
+              default:
+                  return;
+          }
+          fetchUsers(); // Refresh the list on success
+      } catch (err) {
+          toast.error(`Failed to ${action}.`);
+      } finally {
+          setConfirmation(null); // Close the modal
+      }
+  };
+
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  const handleDeactivateUser = async (userId, userName) => {
-    if (window.confirm(`Are you sure you want to deactivate ${userName}? Their account will be disabled.`)) {
-      try {
-        await axios.put(`/api/admin/users/${userId}/deactivate`);
-        toast.success(`${userName} has been deactivated.`);
-        fetchUsers(); // Refresh the user list
-      } catch (err) {
-        toast.error(err.response?.data?.msg || 'Failed to deactivate user.');
-      }
-    }
-  };
-
-  const handleReactivateUser = async (userId, userName) => {
-    if (window.confirm(`Are you sure you want to re-activate ${userName}?`)) {
-      try {
-        await axios.put(`/api/admin/users/${userId}/reactivate`);
-        toast.success(`${userName} has been re-activated.`);
-        fetchUsers(); // Refresh the list
-      } catch (err) {
-        toast.error('Failed to re-activate user.');
-      }
-    }
-  };
-
   if (loading) return <p>Loading users...</p>;
-
-  console.log('Users state before rendering:', users);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-xl">
@@ -81,45 +88,98 @@ const UserList = () => {
                             <td className="py-2 px-4">{user.full_name}</td>
                             <td className="py-2 px-4">{user.email}</td>
                             <td className="py-2 px-4 capitalize">
-                                {/* This safely handles users with zero, one, or multiple roles */}
                                 {(user.roles && user.roles.length > 0)
                                     ? user.roles.map(r => r.role_name.replace('_', ' ')).join(', ')
                                     : 'Student'
                                 }
                             </td>
                             <td className="py-2 px-4">
-                                {user.is_active
-                                    ? <span className="text-green-600 font-semibold">Active</span>
-                                    : <span className="text-red-600 font-semibold">Inactive</span>}
-                            </td>
-                            <td className="py-2 px-4">
-                                {user.is_active ? (
-                                    <button
-                                        onClick={() => handleDeactivateUser(user.user_id, user.full_name)}
-                                        className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-xs"
-                                    >
-                                        Deactivate
-                                    </button>
+                                {!user.is_active ? (
+                                    <span className="text-red-600 font-semibold">Inactive</span>
+                                ) : !user.is_verified ? (
+                                    <span className="text-yellow-600 font-semibold">Invited</span>
                                 ) : (
-                                    <button
-                                        onClick={() => handleReactivateUser(user.user_id, user.full_name)}
-                                        className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-xs"
-                                    >
-                                        Re-activate
-                                    </button>
+                                    <span className="text-green-600 font-semibold">Active</span>
                                 )}
                             </td>
+                            <td className="py-2 px-4 flex items-center gap-2">
+                              <button
+                                  onClick={() => setManagingUser(user)}
+                                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded text-xs"
+                              >
+                                  Manage Roles
+                              </button>
+                              {user.is_active ? (
+                                  <button
+                                      onClick={() => setConfirmation({
+                                            action: 'deactivate', user,
+                                            title: 'Deactivate User',
+                                            message: `Are you sure you want to deactivate ${user.full_name}?`,
+                                            confirmText: 'Deactivate',
+                                            confirmClass: 'bg-red-500 hover:bg-red-600'
+                                      })}
+                                      className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded text-xs"
+                                  >
+                                      Deactivate
+                                  </button>
+                              ) : (
+                                  <button
+                                      onClick={() => setConfirmation({
+                                            action: 'reactivate', user,
+                                            title: 'Re-activate User',
+                                            message: `Are you sure you want to re-activate ${user.full_name}?`,
+                                            confirmText: 'Re-activate',
+                                            confirmClass: 'bg-green-500 hover:bg-green-600'
+                                      })}
+                                      className="bg-green-500 hover:bg-green-700 text-white font-bold py-1 px-2 rounded text-xs"
+                                  >
+                                      Re-activate
+                                  </button>
+                              )}
+
+                              {/* This button only appears if the user is not verified */}
+                              {!user.is_verified && (
+                                  <button
+                                      onClick={() => setConfirmation({
+                                            action: 'resendInvite', user,
+                                            title: 'Resend Invite',
+                                            message: `This will send a new "Set Your Password" email to ${user.full_name}. Proceed?`,
+                                            confirmText: 'Resend',
+                                            confirmClass: 'bg-purple-500 hover:bg-purple-600'
+                                      })}
+                                      className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-1 px-2 rounded text-xs"
+                                  >
+                                      Resend Invite
+                                  </button>
+                              )}
+                          </td>
                         </tr>
                     ))}
                 </tbody>
             </table>
         </div>
 
-        {/* This part for the modal is perfect */}
         {isCreateModalOpen && (
             <CreateUserModal
                 onClose={() => setCreateModalOpen(false)}
                 onUserCreated={fetchUsers}
+            />
+        )}
+
+        {/* This renders the Assign Role modal when a user is selected */}
+        {managingUser && (
+            <AssignRoleModal
+                user={managingUser}
+                onClose={() => setManagingUser(null)}
+                onRoleAssigned={fetchUsers}
+            />
+        )}
+
+        {confirmation && (
+            <ConfirmationModal
+                {...confirmation}
+                onCancel={() => setConfirmation(null)}
+                onConfirm={handleConfirmAction}
             />
         )}
     </div>

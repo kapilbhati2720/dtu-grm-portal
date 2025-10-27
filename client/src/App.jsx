@@ -18,7 +18,7 @@ import PrivateRoute from './components/PrivateRoute';
 import OfficerRoute from './components/OfficerRoute';
 import AdminRoute from './components/AdminRoute';
 import Notifications from './components/Notifications';
-
+import SetPasswordPage from './pages/SetPasswordPage';
 
 function App() {
   const { isAuthenticated, user, loading, logout } = useContext(AuthContext);
@@ -79,7 +79,8 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
-          
+          <Route path="/set-password/:token" element={<SetPasswordPage />} />
+
           {/* Student Protected Routes */}
           <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
           <Route path="/my-grievances" element={<PrivateRoute><MyGrievancesPage /></PrivateRoute>} />

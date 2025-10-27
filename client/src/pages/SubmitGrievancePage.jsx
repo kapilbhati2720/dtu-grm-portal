@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify'; 
@@ -7,30 +7,38 @@ const SubmitGrievancePage = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    category: 'Academic', // Default category
+    category: '', // Default category
   });
+  const [departments, setDepartments] = useState([]); // State to hold categories from the API
   const navigate = useNavigate();
+
+  // Fetch available departments/categories when the component loads
+  useEffect(() => {
+      const fetchDepartments = async () => {
+          try {
+              const res = await axios.get('/api/departments');
+              setDepartments(res.data);
+          } catch (err) {
+              toast.error("Failed to load grievance categories.");
+          }
+      };
+      fetchDepartments();
+  }, []);
 
   const { title, description, category } = formData;
 
   const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const apiUrl = 'http://localhost:5000/api/grievances';
-      const res = await axios.post(apiUrl, formData);
-      
-      toast.success(`Grievance submitted successfully! Ticket ID: ${res.data.ticket_id}`);
-      // Redirect to the my-grievances page so the user can see their submission
-      navigate('/my-grievances');
-
-    } catch (err) {
-      // This provides a helpful message for any kind of error
-      const errorMessage = err.response?.data?.msg || "An unexpected error occurred. Please try again.";
-      toast.error(errorMessage);
-    }
-  };
+  const onSubmit = async e => {
+        e.preventDefault();
+        try {
+            await axios.post('/api/grievances', formData);
+            toast.success('Grievance submitted successfully!');
+            navigate('/my-grievances');
+        } catch (err) {
+            toast.error(err.response?.data?.msg || 'Failed to submit grievance.');
+        }
+    };
 
   return (
     <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-lg shadow-xl">
@@ -49,11 +57,11 @@ const SubmitGrievancePage = () => {
             onChange={onChange}
             className="shadow border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="Academic">Academic</option>
-            <option value="Hostel">Hostel</option>
-            <option value="Administration">Administration</option>
-            <option value="Library">Library</option>
-            <option value="Accounts">Accounts</option>
+            <option value="">Select a Category...</option>
+                        {/* ✅ FIX: Dropdown is now dynamically generated from the API */}
+                        {departments.map(dept => (
+                            <option key={dept.department_id} value={dept.name}>{dept.name}</option>
+                        ))}
           </select>
         </div>
         <div className="mb-4">

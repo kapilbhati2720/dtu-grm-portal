@@ -129,33 +129,78 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// @route   GET /api/auth
-// @desc    Get logged-in user's data
+// @route   GET api/auth
+// @desc    Get logged in user data (for page reloads)
+// @access  Private
 router.get('/', auth, async (req, res) => {
-  try {
-    const user = await pool.query(
-      "SELECT user_id, full_name, email, roll_number, admission_year, branch_code FROM users WHERE user_id = $1",
-      [req.user.id]
-    );
+    try {
+        // 1. Fetch basic user details from the 'users' table
+        const userRes = await pool.query(
+            "SELECT user_id, full_name, email, roll_number, branch_code, admission_year FROM users WHERE user_id = $1", 
+            [req.user.id]
+        );
 
-    // We also need to fetch the user's roles from the new table
-    const rolesRes = await pool.query(
-      `SELECT r.role_name FROM user_department_roles udr
-       JOIN roles r ON udr.role_id = r.role_id
-       WHERE udr.user_id = $1`,
-      [req.user.id]
-    );
+        if (userRes.rows.length === 0) {
+            return res.status(404).json({ msg: 'User not found' });
+        }
+        let user = userRes.rows[0];
 
-    const userData = {
-      ...user.rows[0],
-      roles: rolesRes.rows,
-    };
+        // 2. Fetch all roles and departments for that user
+        const rolesRes = await pool.query(
+            `SELECT r.role_name, d.department_id, d.name as department_name 
+             FROM user_department_roles udr
+             JOIN roles r ON udr.role_id = r.role_id
+             JOIN departments d ON udr.department_id = d.department_id
+             WHERE udr.user_id = $1`, 
+            [req.user.id]
+        );
 
-    res.json(userData);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server Error');
-  }
+        // 3. Attach the fetched roles to the user object
+        user.roles = rolesRes.rows;
+
+        res.json(user);
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   POST /api/auth/set-password
+// @desc    Set a user's password using a token
+// @access  Public
+router.post('/set-password', async (req, res) => {
+    const { token, password } = req.body;
+
+    try {
+        // 1. Find the user with the matching token that has not expired
+        const userRes = await pool.query(
+            "SELECT * FROM users WHERE verification_token = $1 AND verification_token_expires > NOW()",
+            [token]
+        );
+
+        if (userRes.rows.length === 0) {
+            return res.status(400).json({ msg: 'Invalid or expired token. Please request a new invite.' });
+        }
+
+        // 2. Hash the new password
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        // 3. Update the user's account
+        await pool.query(
+            `UPDATE users 
+             SET password_hash = $1, is_verified = true, verification_token = NULL, verification_token_expires = NULL 
+             WHERE user_id = $2`,
+            [passwordHash, userRes.rows[0].user_id]
+        );
+
+        res.json({ msg: 'Password set successfully! You can now log in.' });
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
 });
 
 module.exports = router;
