@@ -12,6 +12,8 @@ const SubmitGrievancePage = () => {
   const [departments, setDepartments] = useState([]); // State to hold categories from the API
   const navigate = useNavigate();
 
+  const [files, setFiles] = useState(null);
+
   // Fetch available departments/categories when the component loads
   useEffect(() => {
       const fetchDepartments = async () => {
@@ -28,17 +30,46 @@ const SubmitGrievancePage = () => {
   const { title, description, category } = formData;
 
   const onChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const onFileChange = (e) => {
+      setFiles(e.target.files);
+  };
 
   const onSubmit = async e => {
-        e.preventDefault();
-        try {
-            await axios.post('/api/grievances', formData);
-            toast.success('Grievance submitted successfully!');
-            navigate('/my-grievances');
-        } catch (err) {
-            toast.error(err.response?.data?.msg || 'Failed to submit grievance.');
-        }
-    };
+      e.preventDefault();
+
+      // 1. Create a FormData object
+      const data = new FormData();
+      data.append('title', formData.title);
+      data.append('description', formData.description);
+      data.append('category', formData.category);
+
+      // 2. Append all selected files
+      if (files) {
+          // Your middleware allows up to 2 files
+          if (files.length > 2) {
+              toast.error("You can only upload a maximum of 2 files.");
+              return;
+          }
+          for (let i = 0; i < files.length; i++) {
+              data.append('attachments', files[i]);
+          }
+      }
+
+      try {
+          // 3. Send the request as 'multipart/form-data'
+          await axios.post('/api/grievances', data, {
+              headers: {
+                  'Content-Type': 'multipart/form-data'
+              }
+          });
+          toast.success('Grievance submitted successfully!');
+          navigate('/my-grievances');
+      } catch (err) {
+          // Handle file upload errors (e.g., file too large, wrong type)
+          const errorMessage = err.response?.data?.msg || err.message || 'Failed to submit grievance.';
+          toast.error(errorMessage);
+      }
+  };
 
   return (
     <div className="max-w-2xl mx-auto mt-10 p-8 bg-white rounded-lg shadow-xl">
@@ -93,6 +124,23 @@ const SubmitGrievancePage = () => {
             onChange={onChange}
             required
           />
+        </div>
+        <div className="mb-6">
+            <label className="block text-gray-700 font-bold mb-2">
+                Attach Files (Optional)
+            </label>
+            <p className="text-xs text-gray-500 mb-2">Max 2 files, 5MB each. (Images, PDF, Word docs)</p>
+            <input
+                type="file"
+                name="attachments"
+                onChange={onFileChange}
+                multiple
+                className="w-full text-sm text-gray-500 
+                            file:mr-4 file:py-2 file:px-4 
+                            file:rounded file:border-0 file:font-semibold 
+                            file:bg-blue-50 file:text-blue-700 
+                            hover:file:bg-blue-100"
+            />
         </div>
         <div className="flex items-center justify-center">
           <button

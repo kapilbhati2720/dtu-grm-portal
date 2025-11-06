@@ -56,13 +56,17 @@ router.get('/users', [auth, isAdmin], async (req, res) => {
           u.is_active,
           u.is_verified,
           COALESCE(
-              json_agg(DISTINCT jsonb_build_object('role_name', r.role_name)) 
+              json_agg(DISTINCT jsonb_build_object(
+              'role_name', r.role_name,
+              'department_name', d.name
+              )) 
               FILTER (WHERE r.role_id IS NOT NULL), 
               '[]'
           ) as roles
       FROM users u
       LEFT JOIN user_department_roles udr ON u.user_id = udr.user_id
       LEFT JOIN roles r ON udr.role_id = r.role_id
+      LEFT JOIN departments d ON udr.department_id = d.department_id
       GROUP BY u.user_id
       ORDER BY u.created_at DESC;
     `);
@@ -72,8 +76,6 @@ router.get('/users', [auth, isAdmin], async (req, res) => {
     res.status(500).send('Server Error');
   }
 });
-
-// --- NEW ROUTES FOR USER MANAGEMENT ---
 
 // @route   POST /api/admin/assign-role
 // @desc    Assign a role and department to an existing user
@@ -142,7 +144,7 @@ router.post('/create-user', [auth, isAdmin], async (req, res) => {
       [newUserId, roleId, departmentId]
     );
 
-    const setupUrl = `http://localhost:3000/set-password/${setupToken}`; // Change port if your frontend is different
+    const setupUrl = `${process.env.CLIENT_URL}/set-password/${setupToken}`;
     const emailMessage = `
       <h2>Welcome to the DTU Grievance Portal!</h2>
       <p>An administrator has created an account for you.</p>
@@ -164,8 +166,6 @@ router.post('/create-user', [auth, isAdmin], async (req, res) => {
     client.release();
   }
 });
-
-// --- ROUTES FOR ACTIVATING/DEACTIVATING USERS ---
 
 // @route   PUT /api/admin/users/:userId/deactivate
 // @desc    Deactivate a user (soft delete)
@@ -191,9 +191,6 @@ router.put('/users/:userId/deactivate', [auth, isAdmin], async (req, res) => {
     res.status(500).send('Server Error');
   }
 });
-
-
-// --- Your AI routes are great, no changes needed ---
 
 // @route   POST /api/admin/generate-grievance
 router.post('/generate-grievance', [auth, isAdmin], async (req, res) => {
@@ -300,22 +297,20 @@ router.post('/triage-grievance', [auth, isAdmin], async (req, res) => {
       try {
           const setupToken = crypto.randomBytes(32).toString('hex');
           const tokenExpires = new Date(Date.now() + 3600000 * 24); // 24 hours validity
+          
 
           await pool.query(
               "UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE user_id = $3",
               [setupToken, tokenExpires, userId]
           );
-
-          const setupUrl = `http://localhost:5173/set-password/${setupToken}`; // Ensure this port is correct
+          const setupUrl = `${process.env.CLIENT_URL}/set-password/${setupToken}`;
           const emailMessage = `
               <h2>Welcome to the DTU Grievance Portal!</h2>
               <p>An administrator has created or re-sent an invite for your account.</p>
               <p>Please click the link below to set your password. This link is valid for 24 hours.</p>
               <a href="${setupUrl}" style="background-color: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px;">Set Your Password</a>
           `;
-
           await sendEmail({ to: email, subject: 'Activate Your DTU Grievance Portal Account', html: emailMessage });
-          
           res.json({ msg: `Invite resent successfully to ${fullName}.` });
 
       } catch (err) {
@@ -323,5 +318,35 @@ router.post('/triage-grievance', [auth, isAdmin], async (req, res) => {
           res.status(500).send('Server Error');
       }
   });
+
+  // @route   GET /api/admin/grievances/filter
+  // @desc    Get grievances filtered by type (category, status, etc.)
+  // @access  Private (Admin)
+  router.get('/grievances/filter', [auth, isAdmin], async (req, res) => {
+      const { type, value } = req.query; // e.g., type='category', value='Hostel Affairs'
+
+      let query;
+      let queryParams = [];
+
+      // If the type is 'all', select everything. Otherwise, filter.
+      if (type === 'all') {
+          query = `SELECT grievance_id, ticket_id, title, status, created_at FROM grievances ORDER BY created_at DESC`;
+      } else {
+          const allowedFilterTypes = ['category', 'status'];
+          if (!allowedFilterTypes.includes(type)) {
+              return res.status(400).json({ msg: 'Invalid filter type.' });
+          }
+          query = `SELECT grievance_id, ticket_id, title, status, created_at FROM grievances WHERE ${type} = $1 ORDER BY created_at DESC`;
+          queryParams = [value];
+      }
+      try {
+        // ✅ FIX: This block now correctly uses the query and params defined above
+        const filteredGrievances = await pool.query(query, queryParams);
+        res.json(filteredGrievances.rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
 
 module.exports = router;

@@ -3,6 +3,7 @@ import axios from 'axios';
 import io from 'socket.io-client';
 import { jwtDecode } from 'jwt-decode';
 import { AuthContext } from './AuthContext';
+import { toast } from 'react-toastify';
 
 const socket = io('http://localhost:5000', { autoConnect: false });
 
@@ -95,6 +96,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  
+
   const logout = () => {
     setAuthToken(null);
     setToken(null);
@@ -104,6 +107,27 @@ export const AuthProvider = ({ children }) => {
     setUnreadCount(0);
     socket.disconnect();
   };
+
+  useEffect(() => {
+      // This is an "interceptor" that checks every API response
+      const errorInterceptor = axios.interceptors.response.use(
+          response => response, // Pass through successful responses
+          (error) => {
+              // Check if the error is a 401 Unauthorized
+              if (error.response && error.response.status === 401) {
+                  const msg = error.response.data?.msg || "Your session has expired. Please log in again.";
+                  toast.error(msg);
+                  logout(); // Log the user out
+              }
+              return Promise.reject(error);
+          }
+      );
+
+      // Clean up the interceptor when the component unmounts
+      return () => {
+          axios.interceptors.response.eject(errorInterceptor);
+      };
+  }, [logout]); // We run this effect whenever the logout function is defined
 
   return (
     <AuthContext.Provider value={{ token, user, isAuthenticated, loading, login, logout, notifications, unreadCount, fetchNotifications }}>

@@ -1,163 +1,114 @@
+// server/routes/officer.js
+
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const auth = require('../middleware/auth');
 
-module.exports = function(io, onlineUsers) {
-  
-  // This middleware correctly checks the user's role from the token. It's good.
-  const isOfficer = (req, res, next) => {
-    if (req.user && req.user.roles.some(role => role.role_name === 'nodal_officer')) {
-      next();
+// Middleware to check if the user has ANY officer-level role
+const isOfficer = (req, res, next) => {
+    const isOfficerRole = req.user.roles.some(r => 
+        r.role_name === 'nodal_officer' || 
+        r.role_name === 'department_head' || 
+        r.role_name === 'super_admin'
+    );
+    if (isOfficerRole) {
+        next();
     } else {
-      return res.status(403).json({ msg: 'Access denied. Officer resource.' });
+        return res.status(403).json({ msg: 'Access denied. Officer role required.' });
     }
-  };
+};
 
-  // @route   GET /api/officer/grievances
-  // @desc    Get all grievances for the officer's department
-  router.get('/grievances', [auth, isOfficer], async (req, res) => {
+// server/routes/officer.js
+
+// server/routes/officer.js
+
+// @route   GET /api/officer/grievances
+// @desc    Get all grievances for the officer's department(s) AND analytics
+// @access  Private (Officers: Nodal, HOD, Admin)
+router.get('/grievances', [auth, isOfficer], async (req, res) => {
     try {
-      const officerRole = req.user.roles.find(role => role.role_name === 'nodal_officer');
-      if (!officerRole) {
-        return res.status(403).json({ msg: 'Officer role details not found in token.' });
-      }
-      const departmentId = officerRole.department_id;
+        const client = await pool.connect();
+        try {
+            let departmentIds = req.user.roles
+                .filter(r => r.role_name === 'nodal_officer' || r.role_name === 'department_head')
+                .map(r => r.department_id);
 
-      // FIXED QUERY: Joins through grievance_assignments to find grievances for the department.
-      const grievances = await pool.query(
-        `SELECT g.*, u.full_name as student_name 
-         FROM grievance_assignments ga
-         JOIN grievances g ON ga.grievance_id = g.grievance_id
-         JOIN users u ON g.submitted_by_id = u.user_id
-         WHERE ga.department_id = $1
-         ORDER BY g.created_at DESC`,
-        [departmentId]
-      );
-      
-      res.json(grievances.rows);
+            let grievanceQuery, analyticsQuery;
+            let queryParams = [];
 
+            if (req.user.roles.some(r => r.role_name === 'super_admin')) {
+                // Queries for SUPER ADMIN (no department filter)
+                grievanceQuery = `
+                    SELECT g.grievance_id, g.ticket_id, g.title, g.category, g.status, g.created_at 
+                    FROM grievances g 
+                    ORDER BY g.updated_at DESC
+                `;
+                analyticsQuery = `
+                    SELECT 
+                        COUNT(*) FILTER (WHERE status = 'Submitted') AS "newlySubmitted",
+                        COUNT(*) FILTER (WHERE status = 'Awaiting Clarification') AS "awaitingClarification",
+                        COUNT(*) FILTER (WHERE status = 'Submitted' OR status = 'Awaiting Clarification') AS "totalPending",
+                        COUNT(*) FILTER (WHERE status = 'Resolved') AS "resolved",
+                        COUNT(*) FILTER (WHERE status = 'Rejected') AS "rejected",
+                        COUNT(*) FILTER (WHERE status = 'Escalated') AS "escalated"
+                    FROM grievances
+                `;
+            } else if (departmentIds.length > 0) {
+                // Queries for OFFICERS (filters by their department IDs)
+                grievanceQuery = `
+                    SELECT g.grievance_id, g.ticket_id, g.title, g.category, g.status, g.created_at
+                    FROM grievances g
+                    JOIN grievance_assignments ga ON g.grievance_id = ga.grievance_id
+                    WHERE ga.department_id = ANY($1::int[])
+                    ORDER BY g.updated_at DESC
+                `;
+                analyticsQuery = `
+                    SELECT 
+                        COUNT(*) FILTER (WHERE g.status = 'Submitted') AS "newlySubmitted",
+                        COUNT(*) FILTER (WHERE g.status = 'Awaiting Clarification') AS "awaitingClarification",
+                        COUNT(*) FILTER (WHERE (g.status = 'Submitted' OR g.status = 'Awaiting Clarification')) AS "totalPending",
+                        COUNT(*) FILTER (WHERE g.status = 'Resolved') AS "resolved",
+                        COUNT(*) FILTER (WHERE g.status = 'Rejected') AS "rejected",
+                        COUNT(*) FILTER (WHERE g.status = 'Escalated') AS "escalated"
+                    FROM grievances g
+                    JOIN grievance_assignments ga ON g.grievance_id = ga.grievance_id
+                    WHERE ga.department_id = ANY($1::int[])
+                `;
+                queryParams = [departmentIds];
+            } else {
+                // Officer with no assigned departments
+                return res.json({ analytics: { newlySubmitted: 0, awaitingClarification: 0, totalPending: 0, resolved: 0, rejected: 0, escalated: 0 }, grievances: [] });
+            }
+
+            // Run both queries in parallel for efficiency
+            const [grievanceRes, analyticsRes] = await Promise.all([
+                client.query(grievanceQuery, queryParams),
+                client.query(analyticsQuery, queryParams)
+            ]);
+            
+            // Send the combined response
+            res.json({
+                analytics: analyticsRes.rows[0],
+                grievances: grievanceRes.rows
+            });
+
+        } catch (err) {
+            console.error(err.message);
+            res.status(500).send('Server Error');
+        } finally {
+            client.release();
+        }
     } catch (err) {
-      console.error(err.message);
-      res.status(500).send('Server Error');
+        console.error(err.message);
+        res.status(500).send('Server Error');
     }
-  });
-  
-  // @route   PUT /api/officer/grievances/:ticketId/status
-  // @desc    Update the status of a grievance
-  router.put('/grievances/:ticketId/status', [auth, isOfficer], async (req, res) => {
-    const { ticketId } = req.params;
-    const { status } = req.body;
-    const officerId = req.user.id;
+});
 
-    try {
-      // Get officer's department ID from their token
-      const officerRole = req.user.roles.find(role => role.role_name === 'nodal_officer');
-      if (!officerRole) {
-        return res.status(403).json({ msg: 'Officer role details not found in token.' });
-      }
-      const officerDepartmentId = officerRole.department_id;
+// We REMOVE the /grievances/:ticketId/status and /grievances/:ticketId/comments routes
+// because their logic is already perfectly handled by the more secure and robust
+// routes in the main `grievances.js` file. This avoids code duplication.
 
-      // FIXED AUTHORIZATION: Check the grievance_assignments table to ensure the officer is authorized.
-      const grievanceResult = await pool.query(
-        `SELECT g.grievance_id, g.submitted_by_id, ga.department_id 
-         FROM grievances g
-         JOIN grievance_assignments ga ON g.grievance_id = ga.grievance_id
-         WHERE g.ticket_id = $1`,
-        [ticketId]
-      );
-      
-      if (grievanceResult.rows.length === 0) {
-        return res.status(404).json({ msg: 'Grievance not found' });
-      }
-      if (grievanceResult.rows[0].department_id !== officerDepartmentId) {
-        return res.status(403).json({ msg: 'Grievance not assigned to your department' });
-      }
-
-      // If authorized, proceed with the update
-      const grievanceData = grievanceResult.rows[0];
-      const updatedGrievance = await pool.query("UPDATE grievances SET status = $1, updated_at = NOW() WHERE ticket_id = $2 RETURNING *", [status, ticketId]);
-      
-      const updateComment = `Status changed to ${status}`;
-      await pool.query(
-          `INSERT INTO grievance_updates (grievance_id, updated_by_id, update_type, comment) VALUES ($1, $2, 'StatusChange', $3)`,
-          [grievanceData.grievance_id, officerId, updateComment]
-      );
-
-      // Send notification to the student
-      const studentId = grievanceData.submitted_by_id;
-      const notificationMessage = `Your grievance #${ticketId} has been updated to "${status}".`;
-      const notificationLink = `/grievance/${ticketId}`;
-      await pool.query(`INSERT INTO notifications (user_id, message, link) VALUES ($1, $2, $3)`, [studentId, notificationMessage, notificationLink]);
-      
-      const studentSocketId = onlineUsers[studentId];
-      if (studentSocketId) {
-          io.to(studentSocketId).emit('new_notification');
-      }
-      
-      res.json(updatedGrievance.rows[0]);
-    } catch (err) {
-      console.error(err.message);
-      res.status(500).send('Server Error');
-    }
-  });
-
-  // @route   POST /api/officer/grievances/:ticketId/comments
-  // @desc    Add a comment to a grievance
-  router.post('/grievances/:ticketId/comments', [auth, isOfficer], async (req, res) => {
-      const { ticketId } = req.params;
-      const { comment } = req.body;
-      const officerId = req.user.id;
-
-      try {
-          // Get officer's department ID from their token for authorization
-          const officerRole = req.user.roles.find(role => role.role_name === 'nodal_officer');
-          if (!officerRole) {
-              return res.status(403).json({ msg: 'Officer role details not found in token.' });
-          }
-          const officerDepartmentId = officerRole.department_id;
-
-          // Authorize: Check if the grievance is assigned to the officer's department
-          const grievanceResult = await pool.query(
-              `SELECT g.grievance_id, g.submitted_by_id, ga.department_id 
-              FROM grievances g
-              JOIN grievance_assignments ga ON g.grievance_id = ga.grievance_id
-              WHERE g.ticket_id = $1`,
-              [ticketId]
-          );
-
-          if (grievanceResult.rows.length === 0) {
-              return res.status(404).json({ msg: 'Grievance not found' });
-          }
-          if (grievanceResult.rows[0].department_id !== officerDepartmentId) {
-              return res.status(403).json({ msg: 'Grievance not assigned to your department' });
-          }
-
-          // If authorized, add the comment to the grievance_updates table
-          const grievanceData = grievanceResult.rows[0];
-          const newComment = await pool.query(
-              `INSERT INTO grievance_updates (grievance_id, updated_by_id, update_type, comment) VALUES ($1, $2, 'Comment', $3) RETURNING *`,
-              [grievanceData.grievance_id, officerId, comment]
-          );
-
-          // Send notification to the student
-          const studentId = grievanceData.submitted_by_id;
-          const notificationMessage = `An officer commented on your grievance #${ticketId}.`;
-          const notificationLink = `/grievance/${ticketId}`;
-          await pool.query(`INSERT INTO notifications (user_id, message, link) VALUES ($1, $2, $3)`, [studentId, notificationMessage, notificationLink]);
-          
-          const studentSocketId = onlineUsers[studentId];
-          if (studentSocketId) {
-              io.to(studentSocketId).emit('new_notification');
-          }
-          
-          res.status(201).json(newComment.rows[0]);
-
-      } catch (err) {
-          console.error(err.message);
-          res.status(500).send('Server Error');
-      }
-  });
-
-  return router;
+module.exports = function(io, onlineUsers) {
+    return router;
 };

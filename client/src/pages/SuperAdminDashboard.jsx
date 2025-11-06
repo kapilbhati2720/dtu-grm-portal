@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import UserList from '../components/admin/UserList'; // Ensure this path is correct
 import CategoryPieChart from '../components/CategoryPieChart';
@@ -24,24 +25,32 @@ const SuperAdminDashboard = () => {
 
   if (loading) return <p className="p-8">Loading dashboard...</p>;
 
+  const { kpis } = analytics;
+
   return (
     <div className="p-4 sm:p-8 bg-gray-100 min-h-full">
       <h1 className="text-3xl font-bold mb-6">Super Admin Dashboard</h1>
       
       {/* KPI Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-white p-6 rounded-lg shadow-md text-center min-w-[350px]">
-          <h3 className="text-lg font-semibold text-gray-500">Total Grievances</h3>
-          <p className="text-4xl font-bold mt-2">{analytics?.kpis.total || 0}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md text-center min-w-[350px]">
-          <h3 className="text-lg font-semibold text-gray-500">Pending</h3>
-          <p className="text-4xl font-bold mt-2 text-yellow-500">{analytics?.kpis.pending || 0}</p>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow-md text-center min-w-[350px]">
-          <h3 className="text-lg font-semibold text-gray-500">Resolved</h3>
-          <p className="text-4xl font-bold mt-2 text-green-500">{analytics?.kpis.resolved || 0}</p>
-        </div>
+        <Link to="/admin/grievances/all/all">
+          <div className="bg-white p-6 rounded-lg shadow-lg hover:bg-blue-50 transition">
+            <h3 className="text-gray-500">Total Grievances</h3>
+            <p className="text-4xl font-bold text-blue-500">{kpis.total}</p>
+          </div>
+        </Link>
+        <Link to="/admin/grievances/status/Submitted">
+          <div className="bg-white p-6 rounded-lg shadow-lg hover:bg-yellow-50 transition">
+            <h3 className="text-gray-500">Pending</h3>
+            <p className="text-4xl font-bold text-yellow-500">{kpis.pending}</p>
+          </div>
+        </Link>
+        <Link to="/admin/grievances/status/Resolved">
+          <div className="bg-white p-6 rounded-lg shadow-lg hover:bg-green-50 transition">
+            <h3 className="text-gray-500">Resolved</h3>
+            <p className="text-4xl font-bold text-green-500">{kpis.resolved}</p>
+          </div>
+        </Link>
       </div>
       
       {/* Charts Section */}

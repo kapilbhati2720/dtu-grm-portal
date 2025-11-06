@@ -1,10 +1,15 @@
 import React from 'react';
 import { Pie } from 'react-chartjs-2';
+import { useNavigate } from 'react-router-dom';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
 const CategoryPieChart = ({ data }) => {
+
+  // 1. Get the navigate function from the hook
+  const navigate = useNavigate();
+
   const chartData = {
     labels: data.map(item => item.category),
     datasets: [{
@@ -21,15 +26,38 @@ const CategoryPieChart = ({ data }) => {
     borderWidth: 2,
     }],
   };
+
+  // 2. Define the onClick handler function
+  const onClick = (event, elements) => {
+      // Ensure an element was actually clicked
+      if (elements.length > 0) {
+          const clickedElementIndex = elements[0].index;
+          const category = chartData.labels[clickedElementIndex];
+          
+          // Navigate to the new filtered page, encoding the category name for the URL
+          navigate(`/admin/grievances/category/${encodeURIComponent(category)}`);
+      }
+  };
+  const onHover = (event, elements) => {
+    // Change the cursor to a pointer if hovering over a slice, otherwise default
+    if (event.native) {
+      event.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+    }
+  };
+
+
   return (
-    // 1. Wrap the Pie chart in a div with positioning and a set height.
+    // Wrap the Pie chart in a div with positioning and a set height.
     <div className="relative h-80 w-full"> 
       <Pie 
         data={chartData} 
-        // 2. Add options to ensure responsiveness within the new container.
+        // Add options to ensure responsiveness within the new container.
         options={{
           maintainAspectRatio: false,
           responsive: true,
+          onClick: onClick, // Pass the handler to the chart's options
+          onHover: onHover
+
         }}
       />
     </div>

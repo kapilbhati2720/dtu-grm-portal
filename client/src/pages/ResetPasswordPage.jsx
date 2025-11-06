@@ -1,10 +1,10 @@
-// client/src/pages/SetPasswordPage.jsx
+// client/src/pages/ResetPasswordPage.jsx
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
-const SetPasswordPage = () => {
+const ResetPasswordPage = () => {
     const { token } = useParams();
     const navigate = useNavigate();
     const [password, setPassword] = useState('');
@@ -17,17 +17,18 @@ const SetPasswordPage = () => {
             return toast.error("Passwords do not match.");
         }
         try {
-            const res = await axios.post('/api/auth/set-password', { token, password });
+            // Call the new reset-password route
+            const res = await axios.post('/api/auth/reset-password', { token, password });
             toast.success(res.data.msg);
-            navigate('/login');
+            navigate('/login'); // Redirect to login on success
         } catch (err) {
-            toast.error(err.response?.data?.msg || "Failed to set password.");
+            toast.error(err.response?.data?.msg || "Failed to reset password.");
         }
     };
 
     return (
         <div className="max-w-md mx-auto mt-10 p-8 bg-white rounded-lg shadow-xl">
-            <h1 className="text-3xl font-bold text-center mb-6">Set Your Password</h1>
+            <h1 className="text-3xl font-bold text-center mb-6">Reset Your Password</h1>
             <form onSubmit={onSubmit}>
                 <div className="mb-4 relative">
                     <label className="block text-gray-700 text-sm font-bold mb-2">New Password</label>
@@ -60,11 +61,11 @@ const SetPasswordPage = () => {
                     </button>
                 </div>
                 <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                    Set Password and Login
+                    Save New Password
                 </button>
             </form>
         </div>
     );
 };
 
-export default SetPasswordPage;
+export default ResetPasswordPage;

@@ -114,3 +114,12 @@ WHERE
 -- JOIN users u ON u.email = assignments.email
 -- JOIN departments d ON d.name = assignments.department_name
 -- ON CONFLICT (user_id, role_id, department_id) DO NOTHING;
+
+-- UPDATE grievances
+-- SET category = 'Hostel Affairs'
+-- WHERE category = 'Hostel';
+
+SELECT
+    *
+FROM users
+WHERE email = 'neetapandey@dce.ac.in';

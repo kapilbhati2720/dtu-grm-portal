@@ -89,7 +89,15 @@ const UserList = () => {
                             <td className="py-2 px-4">{user.email}</td>
                             <td className="py-2 px-4 capitalize">
                                 {(user.roles && user.roles.length > 0)
-                                    ? user.roles.map(r => r.role_name.replace('_', ' ')).join(', ')
+                                    ? user.roles.map((r, index) => (
+                                        <div key={index}>
+                                            <span className="font-semibold">{r.role_name.replace('_', ' ')}</span>
+                                            {/* Conditionally show the department name if it exists */}
+                                            {r.department_name && (
+                                                <span className="text-gray-500"> ({r.department_name})</span>
+                                            )}
+                                        </div>
+                                    ))
                                     : 'Student'
                                 }
                             </td>

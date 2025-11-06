@@ -7,6 +7,7 @@ import RejectGrievanceModal from '../components/grievances/RejectGrievanceModal'
 import RequestInfoModal from '../components/grievances/RequestInfoModal';
 import ConfirmationModal from '../components/common/ConfirmationModal';
 
+
 const GrievanceDetailPage = () => {
   const { ticketId } = useParams();
   const { user } = useContext(AuthContext);
@@ -19,6 +20,8 @@ const GrievanceDetailPage = () => {
   const [isRejectModalOpen, setRejectModalOpen] = useState(false);
   const [isRequestInfoModalOpen, setRequestInfoModalOpen] = useState(false)
   const [confirmation, setConfirmation] = useState(null);
+  const [commentFiles, setCommentFiles] = useState(null);
+  const [attachments, setAttachments] = useState([]);
 
   // Fetch grievance details from the server
   const fetchGrievanceDetails = useCallback(async () => {
@@ -28,6 +31,7 @@ const GrievanceDetailPage = () => {
           const res = await axios.get(`/api/grievances/${ticketId}`);
           setGrievance(res.data.grievance);
           setUpdates(res.data.updates);
+          setAttachments(res.data.attachments);
       } catch (err) {
           console.error("API Error fetching grievance:", err.response);
           toast.error(err.response?.data?.msg || 'Failed to fetch grievance details.');
@@ -68,22 +72,49 @@ const GrievanceDetailPage = () => {
 
   const handleCommentSubmit = async (e) => {
         e.preventDefault();
-        if (!comment.trim()) return;
-        try {
-            await axios.post(`/api/grievances/${grievance.ticket_id}/comments`, { comment });
-            toast.success('Comment posted!');
-            setComment('');
-            fetchGrievanceDetails();
-        } catch (err) {
-            toast.error('Failed to post comment.');
+        if (!comment.trim()) {
+            toast.error("Please add a comment before submitting.");
+            return;
         }
-  };
+
+        const data = new FormData();
+        data.append('comment', comment);
+
+        if (commentFiles) {
+            if (commentFiles.length > 2) { // Max 2 files
+                toast.error("You can only upload a maximum of 2 files.");
+                return;
+            }
+            for (let i = 0; i < commentFiles.length; i++) {
+                data.append('attachments', commentFiles[i]);
+            }
+        }
+
+        try {
+            await axios.post(`/api/grievances/${grievance.ticket_id}/comments`, data, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            toast.success('Your reply has been posted!');
+            setComment('');
+            setCommentFiles(null);
+            fetchGrievanceDetails(); // Refreshes the page
+        } catch (err) {
+            toast.error(err.response?.data?.msg || 'Failed to post reply.');
+        }
+    };
 
   // Permission check logic
   const isSuperAdmin = user?.roles.some(r => r.role_name === 'super_admin');
   const isAssignedOfficer = isSuperAdmin || (user?.roles.some(r =>
       r.role_name === 'nodal_officer' && r.department_id === grievance?.department_id
   ));
+
+  // handler function to manage the file input.
+  const onCommentFileChange = (e) => {
+    setCommentFiles(e.target.files);
+    };
 
   if (loading) return <p className="text-center mt-8">Loading grievance details...</p>;
   if (!grievance) return <p className="text-center mt-8">Grievance not found or you are not authorized to view it.</p>;
@@ -108,6 +139,26 @@ const GrievanceDetailPage = () => {
                 <p><span className="font-semibold text-gray-800">Submitted:</span> {new Date(grievance.created_at).toLocaleString()}</p>
             </div>
         </div>
+
+        {attachments.length > 0 && (
+            <div className="bg-white p-8 rounded-lg shadow-xl mb-8">
+                <h2 className="text-2xl font-bold mb-4">Attachments</h2>
+                <div className="space-y-3">
+                    {attachments.map(att => (
+                        <a 
+                            key={att.attachment_id}
+                            // Use the full URL to the backend server
+                            href={`http://localhost:5000/${att.file_url.replace(/\\/g, '/')}`} 
+                            target="_blank" // Opens in a new tab
+                            rel="noopener noreferrer"
+                            className="block text-blue-600 hover:underline"
+                        >
+                            {att.file_name}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        )}
 
         {/* --- Officer Actions Section --- */}
         {isAssignedOfficer && (
@@ -173,6 +224,17 @@ const GrievanceDetailPage = () => {
                     placeholder="Type your comment here..."
                     required
                 ></textarea>
+                <input
+                    type="file"
+                    name="attachments"
+                    onChange={onCommentFileChange}
+                    multiple
+                    className="w-full text-sm text-gray-500 mt-4
+                            file:mr-4 file:py-2 file:px-4 
+                            file:rounded file:border-0 file:font-semibold 
+                            file:bg-blue-50 file:text-blue-700 
+                            hover:file:bg-blue-100"
+                />
                 <button
                     type="submit"
                     className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"

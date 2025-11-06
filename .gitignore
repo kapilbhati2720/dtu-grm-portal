@@ -15,3 +15,5 @@ build/
 
 # Temporary SQL files
 *.pgsql # Ignore all .pgsql files
+
+/server/uploads/

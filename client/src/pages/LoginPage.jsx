@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { toast } from 'react-toastify';
 
@@ -7,6 +7,7 @@ const LoginPage = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const [showPassword, setShowPassword] = useState(false);
 
   const { email, password } = formData;
 
@@ -50,16 +51,29 @@ const LoginPage = () => {
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="password">
             Password
           </label>
-          <input
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
-            id="password"
-            type="password"
-            placeholder="******************"
-            name="password"
-            value={password}
-            onChange={onChange}
-            required
-          />
+          <div className="relative">
+              <input
+                  className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  id="password"
+                  type={showPassword ? "text" : "password"} // Set type based on state
+                  placeholder="******************"
+                  name="password" value={password} onChange={onChange} required
+              />
+              {/* The Toggle Button */}
+              <button 
+                  type="button" 
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 px-3 flex items-center text-sm text-gray-600"
+                  style={{ marginBottom: '12px' }} // Adjust alignment
+              >
+                  {showPassword ? "Hide" : "Show"}
+              </button>
+          </div>
+          <div className="text-right mt-2">
+                        <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline" >
+                            Forgot Password?
+                        </Link>
+          </div>
         </div>
         <div className="flex items-center justify-between">
           <button

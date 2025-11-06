@@ -19,6 +19,9 @@ import OfficerRoute from './components/OfficerRoute';
 import AdminRoute from './components/AdminRoute';
 import Notifications from './components/Notifications';
 import SetPasswordPage from './pages/SetPasswordPage';
+import FilteredGrievancesPage from './pages/FilteredGrievancesPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage'; 
+import ResetPasswordPage from './pages/ResetPasswordPage';
 
 function App() {
   const { isAuthenticated, user, loading, logout } = useContext(AuthContext);
@@ -80,6 +83,8 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/set-password/:token" element={<SetPasswordPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} /> 
+          <Route path="/reset-password/:token" element={<ResetPasswordPage />} /> 
 
           {/* Student Protected Routes */}
           <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
@@ -93,6 +98,7 @@ function App() {
 
           {/* Admin Protected Route */}
           <Route path="/admin/dashboard" element={<AdminRoute><SuperAdminDashboard /></AdminRoute>} />
+          <Route path="/admin/grievances/:filterType/:filterValue" element={<AdminRoute><FilteredGrievancesPage /></AdminRoute>} />
         </Routes>
       </main>
       <ToastContainer

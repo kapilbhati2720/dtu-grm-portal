@@ -33,3 +33,10 @@ CREATE TABLE grievance_assignments (
 ALTER TABLE users DROP COLUMN role;
 ALTER TABLE users DROP COLUMN department_id;
 ALTER TABLE grievances DROP COLUMN assigned_to_dept_id; */
+
+SELECT
+    email,
+    verification_token_expires,
+    NOW() AS current_db_time
+FROM users
+WHERE email = 'vinodsingh@dtu.ac.in';
